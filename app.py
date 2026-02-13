@@ -2,10 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
 from mysql.connector import Error
+import os
 
 app = Flask(__name__)
-CORS(app)   # ✅ IMPORTANT FOR REACT
-
+CORS(app)
 
 # -----------------------------------
 # Database Connection Function
@@ -13,10 +13,10 @@ CORS(app)   # ✅ IMPORTANT FOR REACT
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="Mindz@123",
-            database="emp_onboarding"
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME")
         )
         return connection
     except Error as e:
@@ -54,79 +54,7 @@ def get_employees():
 
 
 # -----------------------------------
-# GET EMPLOYEE BY ID
-# -----------------------------------
-@app.route('/employees/<int:emp_id>', methods=['GET'])
-def get_employee(emp_id):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"error": "Database connection failed"}), 500
-
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM employees WHERE emp_id = %s", (emp_id,))
-        employee = cursor.fetchone()
-
-        if employee:
-            return jsonify(employee)
-        else:
-            return jsonify({"message": "Employee not found"}), 404
-
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# -----------------------------------
-# FILTER BY DEPARTMENT
-# -----------------------------------
-@app.route('/employees/department/<string:dept>', methods=['GET'])
-def get_by_department(dept):
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"error": "Database connection failed"}), 500
-
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM employees WHERE department = %s", (dept,))
-        result = cursor.fetchall()
-        return jsonify(result)
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# -----------------------------------
-# PAGINATION
-# -----------------------------------
-@app.route('/employees/page', methods=['GET'])
-def get_paginated():
-    page = int(request.args.get('page', 1))
-    limit = int(request.args.get('limit', 5))
-    offset = (page - 1) * limit
-
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({"error": "Database connection failed"}), 500
-
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM employees LIMIT %s OFFSET %s", (limit, offset))
-        result = cursor.fetchall()
-        return jsonify(result)
-    except Error as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# -----------------------------------
-# ADD NEW EMPLOYEE
+# ADD EMPLOYEE
 # -----------------------------------
 @app.route('/employees', methods=['POST'])
 def add_employee():
@@ -134,11 +62,6 @@ def add_employee():
 
     if not data:
         return jsonify({"error": "Invalid JSON input"}), 400
-
-    required_fields = ["first_name", "email"]
-    for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f"{field} is required"}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -186,9 +109,6 @@ def add_employee():
 def update_employee(emp_id):
     data = request.get_json()
 
-    if not data:
-        return jsonify({"error": "Invalid JSON input"}), 400
-
     conn = get_db_connection()
     if not conn:
         return jsonify({"error": "Database connection failed"}), 500
@@ -228,9 +148,6 @@ def update_employee(emp_id):
         cursor.execute(query, values)
         conn.commit()
 
-        if cursor.rowcount == 0:
-            return jsonify({"message": "Employee not found"}), 404
-
         return jsonify({"message": "Employee updated successfully"})
 
     except Error as e:
@@ -254,9 +171,6 @@ def delete_employee(emp_id):
         cursor.execute("DELETE FROM employees WHERE emp_id = %s", (emp_id,))
         conn.commit()
 
-        if cursor.rowcount == 0:
-            return jsonify({"message": "Employee not found"}), 404
-
         return jsonify({"message": "Employee deleted successfully"})
 
     except Error as e:
@@ -266,8 +180,5 @@ def delete_employee(emp_id):
         conn.close()
 
 
-# -----------------------------------
-# RUN APPLICATION
-# -----------------------------------
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True)
