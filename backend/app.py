@@ -1,28 +1,41 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import mysql.connector
-from mysql.connector import Error
+import psycopg2
 import os
 
 app = Flask(__name__)
 CORS(app)
+
 
 # -----------------------------------
 # Database Connection Function
 # -----------------------------------
 def get_db_connection():
     try:
-        connection = mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            user=os.getenv("DB_USER", "root"),
-            password=os.getenv("DB_PASSWORD", "Mindz@123"),
-            database=os.getenv("DB_NAME", "emp_onboarding")
+        database_url = os.environ.get("DATABASE_URL")
+
+        if not database_url:
+            raise Exception("DATABASE_URL not found in environment variables")
+
+        connection = psycopg2.connect(
+            database_url,
+            sslmode="require"
         )
+
         return connection
-    except Error as e:
-        print("Database connection error:", e)
+
+    except Exception as e:
+        print("❌ Database connection error:", e)
         return None
 
+
+# -----------------------------------
+# Helper: Convert rows to dict
+# -----------------------------------
+def fetch_all_as_dict(cursor):
+    columns = [desc[0] for desc in cursor.description]
+    rows = cursor.fetchall()
+    return [dict(zip(columns, row)) for row in rows]
 
 
 # -----------------------------------
@@ -43,12 +56,15 @@ def get_employees():
         return jsonify({"error": "Database connection failed"}), 500
 
     try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM employees")
-        employees = cursor.fetchall()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM employees ORDER BY emp_id")
+        employees = fetch_all_as_dict(cursor)
         return jsonify(employees)
-    except Error as e:
+
+    except Exception as e:
+        print("❌ Fetch error:", e)
         return jsonify({"error": str(e)}), 500
+
     finally:
         cursor.close()
         conn.close()
@@ -96,8 +112,10 @@ def add_employee():
 
         return jsonify({"message": "Employee added successfully"}), 201
 
-    except Error as e:
+    except Exception as e:
+        print("❌ Insert error:", e)
         return jsonify({"error": str(e)}), 500
+
     finally:
         cursor.close()
         conn.close()
@@ -151,8 +169,10 @@ def update_employee(emp_id):
 
         return jsonify({"message": "Employee updated successfully"})
 
-    except Error as e:
+    except Exception as e:
+        print("❌ Update error:", e)
         return jsonify({"error": str(e)}), 500
+
     finally:
         cursor.close()
         conn.close()
@@ -174,13 +194,18 @@ def delete_employee(emp_id):
 
         return jsonify({"message": "Employee deleted successfully"})
 
-    except Error as e:
+    except Exception as e:
+        print("❌ Delete error:", e)
         return jsonify({"error": str(e)}), 500
+
     finally:
         cursor.close()
         conn.close()
 
 
+# -----------------------------------
+# RUN APP (Production Ready for Render)
+# -----------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
