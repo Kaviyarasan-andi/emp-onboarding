@@ -13,15 +13,16 @@ CORS(app)
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            database=os.getenv("DB_NAME")
+            host=os.getenv("DB_HOST", "localhost"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASSWORD", "Mindz@123"),
+            database=os.getenv("DB_NAME", "emp_onboarding")
         )
         return connection
     except Error as e:
         print("Database connection error:", e)
         return None
+
 
 
 # -----------------------------------
@@ -181,4 +182,5 @@ def delete_employee(emp_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
